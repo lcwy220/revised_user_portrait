@@ -2,15 +2,15 @@
 
 import redis
 from elasticsearch import Elasticsearch
-#from rediscluster import RedisCluster
+from rediscluster import RedisCluster
 from global_config import ZMQ_VENT_PORT_FLOW1, ZMQ_CTRL_VENT_PORT_FLOW1, ZMQ_VENT_HOST_FLOW1, ZMQ_CTRL_HOST_FLOW1, BIN_FILE_PATH
 from global_config import REDIS_CLUSTER_HOST_FLOW1, REDIS_CLUSTER_PORT_FLOW1,\
                           REDIS_CLUSTER_HOST_FLOW2, REDIS_CLUSTER_PORT_FLOW2,\
-                          REDIS_HOST, REDIS_PORT,REDIS_TEXT_MID_HOST, REDIS_TEXT_MID_PORT
-from global_config import WEIBO_API_HOST, WEIBO_API_PORT,ES_COPY_USER_PORTAIT_HOST
+                          REDIS_HOST, REDIS_PORT
+from global_config import WEIBO_API_HOST, WEIBO_API_PORT
 from global_config import USER_PROFILE_ES_HOST, USER_PROFILE_ES_PORT, ES_CLUSTER_HOST_FLOW1,\
                           USER_PORTRAIT_ES_HOST, USER_PORTRAIT_ES_PORT,\
-                          FLOW_TEXT_ES_HOST, FLOW_TEXT_ES_PORT
+                          FLOW_TEXT_ES_HOST, FLOW_TEXT_ES_PORT, ES_COPY_USER_PORTAIT_HOST, REDIS_TEXT_MID_HOST, REDIS_TEXT_MID_PORT
 from global_config import UNAME2UID_HOST, UNAME2UID_PORT
 from global_config import RETWEET_REDIS_HOST, RETWEET_REDIS_PORT
 from global_config import COMMENT_REDIS_HOST, COMMENT_REDIS_PORT
@@ -23,13 +23,12 @@ def _default_cluster_redis(host=REDIS_CLUSTER_HOST_FLOW1, port=REDIS_CLUSTER_POR
     weibo_redis = RedisCluster(startup_nodes = startup_nodes)
     return weibo_redis
 
-R_CLUSTER_FLOW1 = redis.StrictRedis(host=REDIS_CLUSTER_HOST_FLOW1, port=REDIS_CLUSTER_PORT_FLOW1)
-R_CLUSTER_FLOW2 = redis.StrictRedis(host=REDIS_CLUSTER_HOST_FLOW2, port=REDIS_CLUSTER_PORT_FLOW2)
-#R_CLUSTER_FLOW1 = _default_cluster_redis(host=REDIS_CLUSTER_HOST_FLOW1, port=REDIS_CLUSTER_PORT_FLOW1)
-#R_CLUSTER_FLOW2 = _default_cluster_redis(host=REDIS_CLUSTER_HOST_FLOW2, port=REDIS_CLUSTER_PORT_FLOW2)
+R_CLUSTER_FLOW1 = _default_cluster_redis(host=REDIS_CLUSTER_HOST_FLOW1, port=REDIS_CLUSTER_PORT_FLOW1)
+R_CLUSTER_FLOW2 = _default_cluster_redis(host=REDIS_CLUSTER_HOST_FLOW2, port=REDIS_CLUSTER_PORT_FLOW2)
 
 def _default_redis(host=REDIS_HOST, port=REDIS_PORT, db=1):
     return redis.StrictRedis(host, port, db)
+
 redis_flow_text_mid = _default_redis(host=REDIS_TEXT_MID_HOST, port=REDIS_TEXT_MID_PORT, db=2)
 
 redis_host_list = ["1", "2"]
@@ -61,7 +60,9 @@ R_12 = _default_redis(host=REDIS_HOST, port=REDIS_PORT, db=12)
 R_DICT = {'0':R_0, '1':R_1, '2':R_2, '3':R_3, '4':R_4, '5':R_5, '6':R_6, '7':R_7,\
           '8':R_8, '9':R_9, '10':R_10, '11':R_11, '12':R_12}
 
+#use to save user sentiment trend for all
 R_SENTIMENT_ALL = _default_redis(host=REDIS_HOST, port=REDIS_PORT, db=11)
+
 #use to save user domain in user_portrait
 R_DOMAIN = _default_redis(host=REDIS_HOST, port=REDIS_PORT, db=12)
 r_domain_name = 'user_domain'
@@ -76,11 +77,9 @@ R_TOPIC_SENTIMENT = _default_redis(host=REDIS_HOST, port=REDIS_PORT, db=13)
 r_topic_sentiment_pre = 'sentiment_topic_'
 
 
-
 #use to save sentiment keywords task information to redis queue
 R_SENTIMENT_KEYWORDS = _default_redis(host=REDIS_HOST, port=REDIS_PORT, db=10)
 r_sentiment_keywords_name = 'sentiment_keywords_task'
-
 
 # use to write group task
 # two type data----group task;  group task members
@@ -115,7 +114,8 @@ update_month_redis = _default_redis(host=REDIS_HOST, port=REDIS_PORT, db=5)
 UPDATE_MONTH_REDIS_KEY = 'update_month'
 
 # elasticsearch initialize, one for user_profile, one for user_portrait
-es_user_profile = Elasticsearch(USER_PROFILE_ES_HOST, timeout = 600)
+#es_user_profile = Elasticsearch(USER_PROFILE_ES_HOST, timeout = 600)
+es_user_profile = Elasticsearch(USER_PORTRAIT_ES_HOST, timeout = 600)
 es_user_portrait = Elasticsearch(USER_PORTRAIT_ES_HOST, timeout = 6000)
 es_flow_text = Elasticsearch(FLOW_TEXT_ES_HOST, timeout=600)
 es_group_result = Elasticsearch(USER_PORTRAIT_ES_HOST, time_out=600)
@@ -124,7 +124,6 @@ es_comment = Elasticsearch(USER_PORTRAIT_ES_HOST, timeout = 600)
 es_copy_portrait = Elasticsearch(USER_PORTRAIT_ES_HOST, timeout = 600)
 es_tag = Elasticsearch(USER_PORTRAIT_ES_HOST, timeout=600)
 es_sentiment_task = Elasticsearch(USER_PORTRAIT_ES_HOST, timeout = 600)
-
 
 # elasticsearch index_name and index_type
 profile_index_name = 'weibo_user'  # user profile es
@@ -159,7 +158,7 @@ sentiment_keywords_index_type = 'sentiment'
 tag_index_name = 'custom_attribute'
 tag_index_type = 'attribute'
 #use to load balck words of weibo keywords
-BLACK_WORDS_PATH = '/home/user_portrait_0320/revised_user_portrait/user_portrait/user_portrait/cron/text_attribute/black.txt'
+BLACK_WORDS_PATH = '/home/ubuntu8/huxiaoqian/user_portrait/user_portrait/cron/text_attribute/black.txt'
 
 def load_black_words():
     black_words = set([line.strip('\r\n') for line in file(BLACK_WORDS_PATH)])
@@ -192,3 +191,4 @@ COPY_USER_PORTRAIT_ACTIVENESS = "copy_user_portrait_activeness"
 COPY_USER_PORTRAIT_ACTIVENESS_TYPE = 'activeness'
 COPY_USER_PORTRAIT_SENSITIVE = "copy_user_portrait_sensitive"
 COPY_USER_PORTRAIT_SENSITIVE_TYPE = 'sensitive'
+
