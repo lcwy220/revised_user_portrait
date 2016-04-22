@@ -20,11 +20,9 @@ def scan_compute_redis():
         user_list = json.loads(results[uid])
         in_date = user_list[0]
         status = user_list[1]
-        if status == '2': #imme
+        if status == '1': #imme
             #test
             count += 1
-            if count >= 3:
-                break
             iter_user_list.append(uid)
             mapping_dict[uid] = json.dumps([in_date, '3']) # mark status:3 computing
         if len(iter_user_list) % 100 == 0 and len(iter_user_list) != 0:
@@ -42,22 +40,39 @@ def scan_compute_redis():
             else:
                 change_status_compute_fail(mapping_dict)
             
+            #when uid user no weibo at latest week to change compute status to 1
+            if len(user_keywords_dict) != len(iter_user_list):
+                change_mapping_dict = dict()
+                change_user_list = set(iter_user_list) - set(user_keywords_dict.keys())
+                for change_user in change_user_list:
+                    change_mapping_dict[change_user] = json.dumps([in_date, '1'])
+                r.hmset('compute', change_mapping_dict)
+
             iter_user_list = []
             mapping_dict = {}
             
     if iter_user_list != [] and mapping_dict != {}:
         r.hmset('compute', mapping_dict)
         #acquire bulk user weibo date
+        print 'iter_user_list:', iter_user_list
         if WEIBO_API_INPUT_TYPE == 0:
             user_keywords_dict, user_weibo_dict, online_pattern_dict, character_start_ts = read_flow_text_sentiment(iter_user_list)
         else:
             user_keywords_dict, user_weibo_dict, online_pattern_dict, character_start_ts = read_flow_text(iter_user_list)
         #compute text attribute
+        print 'user_weibo_dict:', len(user_weibo_dict)
         compute_status = test_cron_text_attribute_v2(user_keywords_dict, user_weibo_dict, online_pattern_dict, character_start_ts)
         if compute_status==True:
             change_status_computed(mapping_dict)
         else:
             change_status_compute_fail(mapping_dict)
+        #when uid user no weibo at latest week to change compute status to 1
+        if len(user_keywords_dict) != len(iter_user_list):
+            change_mapping_dict = dict()
+            change_user_list = set(iter_user_list) - set(user_keywords_dict.keys())
+            for change_user in change_user_list:
+                change_mapping_dict[change_user] = json.dumps([in_date, '1'])
+            r.hmset('compute', change_mapping_dict)
 
 
 def change_status_computed(mapping_dict):

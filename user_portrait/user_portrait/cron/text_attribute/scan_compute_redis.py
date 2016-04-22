@@ -8,6 +8,7 @@ reload(sys)
 sys.path.append('../../')
 from global_utils import R_RECOMMENTATION as r
 from parameter import WEIBO_API_INPUT_TYPE
+from time_utils import ts2datetime, datetime2ts
 
 def scan_compute_redis():
     hash_name = 'compute'
@@ -18,7 +19,7 @@ def scan_compute_redis():
         user_list = json.loads(results[uid])
         in_date = user_list[0]
         status = user_list[1]
-        if status == '1':
+        if status == '2':
             iter_user_list.append(uid)
             mapping_dict[uid] = json.dumps([in_date, '3']) # mark status:3 computing
         if len(iter_user_list) % 100 == 0 and len(iter_user_list) != 0:
@@ -36,7 +37,15 @@ def scan_compute_redis():
                 change_status_computed(mapping_dict)
             else:
                 change_status_compute_fail(mapping_dict)
-            
+
+            #deal user no weibo to compute portrait attribute
+            if len(user_keywords_dict) != len(iter_user_list):
+                change_mapping_dict = dict()
+                change_user_list = set(iter_user_list) - set(user_keywords_dict.keys())
+                for change_user in change_user_list:
+                    change_mapping_dict[change_user] = json.dumps([in_date, '2'])
+                r.hmset(change_mapping_dict)
+
             iter_user_list = []
             mapping_dict = {}
             
@@ -53,6 +62,13 @@ def scan_compute_redis():
             change_status_computed(mapping_dict)
         else:
             change_status_compute_fail(mapping_dict)
+        #deal user no weibo to compute portrait attribute
+        if len(user_keywords_dict) != len(iter_user_list):
+            change_mapping_dict = dict()
+            change_user_list = set(iter_user_list) - set(user_keywords_dict.keys())
+            for change_user in change_user_list:
+                change_mapping_dict[change_user] = json.dumps([in_date, '2'])
+            r.hmset(change_mapping_dict)
 
 
 def change_status_computed(mapping_dict):

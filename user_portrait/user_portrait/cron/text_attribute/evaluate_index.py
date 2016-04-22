@@ -47,7 +47,7 @@ def get_activity_time(uid_list):
             for j in range(0, len(uid_list)):
                 uid = uid_list[j]
                 if uid not in activity_list_dict:
-                    activity_list_dict[uid] = []
+                    activity_list_dict[uid] = [0 for i in range(0, 96)]
                 user_r_result = r_result[j]
                 if user_r_result:
                     user_activity_dict = json.loads(user_r_result)

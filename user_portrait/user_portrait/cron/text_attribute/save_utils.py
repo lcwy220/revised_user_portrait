@@ -9,7 +9,7 @@ from global_utils import R_CLUSTER_FLOW2 as r_cluster
 from time_utils import datetime2ts, ts2datetime
 
 index_type = 'user'
-index_name = 'user_portrait'
+index_name = 'user_portrait_1222'
 
 def attr_hash(uid):
     hashtag_results = {}
@@ -34,7 +34,7 @@ def attr_hash(uid):
 
 def save_user_results(bulk_action):
     print 'save utils bulk action len:', len(bulk_action)
-    print 'bulk action:', bulk_action
-    #es.bulk(bulk_action, index='user_portrait_1222', doc_type=index_type, timeout=60)
+    #print 'bulk action:', bulk_action
+    es.bulk(bulk_action, index='user_portrait_1222', doc_type=index_type, timeout=60)
     return True    
 

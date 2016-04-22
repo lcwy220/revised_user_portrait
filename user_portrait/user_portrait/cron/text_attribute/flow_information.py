@@ -12,6 +12,7 @@ import json
 reload(sys)
 sys.path.append('../../')
 from global_utils import R_CLUSTER_FLOW2 as r_cluster
+from global_utils import R_CLUSTER_FLOW3 as r_cluster_3
 from global_utils import flow_text_index_name_pre, flow_text_index_type, es_flow_text
 from global_utils import R_ADMIN as r_sensitive
 from parameter import DAY, MAX_VALUE, sensitive_score_dict
@@ -40,10 +41,10 @@ def get_flow_information(uid_list):
         flow_text_index_name = flow_text_index_name_pre + iter_date
         uid_day_geo = {}
         #compute hashtag and geo
-        hashtag_results = r_cluster.hmget('hashtag_'+str(ts), uid_list)
+        hashtag_results = r_cluster_3.hmget('hashtag_'+str(ts), uid_list)
         ip_results = r_cluster.hmget('new_ip_'+str(ts), uid_list)
         #compute sensitive_words
-        sensitive_results = r_cluster.hmget('sensitive_'+str(ts), uid_list)
+        sensitive_results = r_cluster_3.hmget('sensitive_'+str(ts), uid_list)
         count = 0 
         for uid in uid_list:
             #init iter_results[uid]
@@ -167,15 +168,16 @@ def get_flow_information_v2(uid_list, all_user_keywords_dict):
         ts = now_date_ts - DAY*i
         uid_day_geo = {}
         #compute hashtag and geo
-        hashtag_results = r_cluster.hmget('hashtag_'+str(ts), uid_list)
+        print 'flow information uid_list:', uid_list
+        hashtag_results = r_cluster_3.hmget('hashtag_'+str(ts), uid_list)
         ip_results = r_cluster.hmget('new_ip_'+str(ts), uid_list)
         #compute sensitive_words
-        sensitive_results = r_cluster.hmget('sensitive_'+str(ts), uid_list)
+        sensitive_results = r_cluster_3.hmget('sensitive_'+str(ts), uid_list)
         count = 0 
         for uid in uid_list:
             #init iter_results[uid]
             if uid not in iter_results:
-                iter_results[uid] = {'hashtag':{}, 'geo':{},'geo_track':[],'keywords':{}, 'sensitive':{}}
+                iter_results[uid] = {'hashtag':{}, 'geo':{},'geo_track':[],'keywords':{}, 'sensitive':{}, 'school':{}}
             #compute hashtag
             hashtag_item = hashtag_results[count]
             if hashtag_item:
@@ -207,7 +209,7 @@ def get_flow_information_v2(uid_list, all_user_keywords_dict):
                 uid_ip_dict = {}
             for ip in uid_ip_dict:
                 ip_count = len(uid_ip_dict[ip].split('&'))
-                geo = ip2city(ip)
+                geo, school = ip2city(ip)
                 if geo:
                     try:
                         iter_results[uid]['geo'][geo] += ip_count
@@ -217,6 +219,11 @@ def get_flow_information_v2(uid_list, all_user_keywords_dict):
                         uid_day_geo[uid][geo] += ip_count
                     except:
                         uid_day_geo[uid][geo] = ip_count
+                if school:
+                    try:
+                        iter_results[uid]['school'][school] += ip_count
+                    except:
+                        iter_results[uid]['school'][school] = ip_count
             iter_results[uid]['geo_track'].append(uid_day_geo[uid])
             count += 1
                
@@ -252,18 +259,29 @@ def get_flow_information_v2(uid_list, all_user_keywords_dict):
             results[uid]['activity_geo_aggs'] = '&'.join([item.split('\t')[-1] for item in geo_dict_keys])
         except:
             results[uid]['activity_geo_aggs'] = ''
-
+        #keywords
         keywords_dict = all_user_keywords_dict[uid]
         keywords_top50 = sorted(keywords_dict.items(), key=lambda x:x[1], reverse=True)[:50]
         keywords_top50_string = '&'.join([keyword_item[0] for keyword_item in keywords_top50])
         results[uid]['keywords'] = json.dumps(keywords_top50)
         results[uid]['keywords_string'] = keywords_top50_string
+        #school dict
+        school_dict = iter_results[uid]['school']
+        school_string = '&'.join(school_dict.keys())
+        if school_dict != {}:
+            is_school = '1'
+        else:
+            is_school = '0'
+        results[uid]['is_school'] = is_school
+        results[uid]['school_string'] = school_string
+        results[uid]['school_dict'] = json.dumps(school_dict)
         
     return results
 
 
 
 def ip2city(ip):
+    school = ''
     try:
         city = IP.find(str(ip))
         if city:
@@ -273,9 +291,11 @@ def ip2city(ip):
         city_list = city.split('\t')
         if len(city_list)==4:
             city = '\t'.join(city_list[:3])
+            if '学' in city_list[-1]:
+                school = city_list[-1]
     except Exception,e:
-        return None
-    return city
+        return None, None
+    return city, school
 
 #abadon in version:15-12-08
 '''
@@ -525,6 +545,7 @@ def update_flow_information(user_info):
     return result
 
 if __name__=='__main__':
-    test_uid = ['1640601392', '2294854302']
-    result_dict = get_flow_information(test_uid)
+    test_uid = ['1007298497', '1082896707']
+    all_user_keywords_dict = {'1007298497':{}, '1082896707':{}}
+    result_dict = get_flow_information_v2(test_uid, all_user_keywords_dict)
     print 'result_dict:', result_dict

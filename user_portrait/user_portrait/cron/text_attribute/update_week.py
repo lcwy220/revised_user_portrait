@@ -4,6 +4,7 @@ update attribute of user portrait one week
 update attr: topic, keywords, online_pattern, importance
 update freq: one week
 '''
+import IP
 import sys
 import time
 import json
@@ -18,10 +19,67 @@ reload(sys)
 sys.path.append('../../')
 from global_utils import es_user_portrait as es
 from global_utils import es_user_portrait
+from global_utils import portrait_index_name, portrait_index_type
 from global_utils import update_week_redis, UPDATE_WEEK_REDIS_KEY
-from parameter import WEIBO_API_INPUT_TYPE, WEEK, RUN_TYPE, RUN_TEST_TIME
-from time_utils import ts2datetime
+from global_utils import R_CLUSTER_FLOW2 as r_cluster
+from parameter import WEIBO_API_INPUT_TYPE, WEEK, RUN_TYPE,\
+                      RUN_TEST_TIME, DAY
+from time_utils import ts2datetime, datetime2ts
 
+def ip2school(ip):
+    school = ''
+    #try:
+    
+    city = IP.find(str(ip))
+    if city:
+        city = city.encode('utf-8')
+    else:
+        return None
+    city_list = city.split('\t')
+    if len(city_list) == 4 and '学' in city_list[-1]:
+        school = city_list[-1]
+    #except Exception, e:
+    #    return None
+    return school
+
+
+def get_school(uid_list):
+    now_ts = time.time()
+    now_date_ts = datetime2ts(ts2datetime(now_ts))
+    school_results = {}
+    for i in range(WEEK, 0, -1):
+        ts = now_date_ts - DAY * i
+        ip_results = r_cluster.hmget('new_ip_'+str(ts), uid_list)
+        count = 0
+        for uid in uid_list:
+            if uid not in school_results:
+                school_results[uid] = {}
+            ip_item = ip_results[count]
+            if ip_item:
+                uid_ip_dict = json.loads(ip_item)
+            else:
+                uid_ip_dict = {}
+            for ip in uid_ip_dict:
+                ip_count = len(uid_ip_dict[ip].split('&'))
+                
+                school = ip2school(ip)
+                if school:
+                    try:
+                        school_results[uid][school] += ip_count
+                    except:
+                        school_results[uid][school] = ip_count
+           
+            count += 1
+    results = {} 
+    for uid in uid_list:
+        school_dict = school_results[uid]
+        school_string = '&'.join(school_dict.keys())
+        if school_dict != {}:
+            is_school = '1'
+        else:
+            is_school = '0'
+        results[uid] = {'is_school': is_school, 'school_string': school_string, 'school_dict': json.dumps(school_dict)}
+    return results
 
 def deal_bulk_action(user_info_list, fansnum_max):
     start_ts = time.time()
@@ -34,24 +92,37 @@ def deal_bulk_action(user_info_list, fansnum_max):
     #compute attribute--keywords, topic, online_pattern            
     #get user topic results by bulk action
     topic_results_dict, topic_results_label = topic_classfiy(uid_list, user_keywords_dict)
+    
+    #update school attribute---is_school/school_string/school_dict
+    school_results_dict = get_school(uid_list)
     #get bulk action
     bulk_action = []
     for uid in uid_list:
         results = {}
         results['uid'] = uid
+        results['is_school'] = school_results_dict[uid]['is_school']
+        results['school_string'] = school_results_dict[uid]['school_string']
+        results['school_dict'] = school_results_dict[uid]['school_dict']
+        #print 'is_school, school_string, school_dict:', results['is_school'],type(results['is_school']) ,results['school_string'],type(results['school_string']), results['school_dict'], type(results['school_dict'])
         #add user topic attribute
         user_topic_dict = topic_results_dict[uid]
         user_label_dict = topic_results_label[uid]
         results['topic'] = json.dumps(user_topic_dict)
         results['topic_string'] = topic_en2ch(user_label_dict)
         #add user keywords attribute
-        keywords_dict = user_keywords_dict[uid]
+        try:
+            keywords_dict = user_keywords_dict[uid]
+        except:
+            keywords_dict = {}
         keywords_top50 = sorted(keywords_dict.items(), key=lambda x:x[1], reverse=True)[:50]
         keywords_top50_string = '&'.join([keyword_item[0] for keyword_item in keywords_top50])
         results['keywords'] = json.dumps(keywords_top50)
         results['keywords_string'] = keywords_top50_string
         #add online_pattern
-        user_online_pattern = json.dumps(online_pattern_dict[uid])
+        try:
+            user_online_pattern = json.dumps(online_pattern_dict[uid])
+        except:
+            user_online_pattern = json.dumps({})
         results['online_pattern'] = user_online_pattern
         try:
             results['online_pattern_aggs'] = '&'.join(user_online_pattern.keys())
@@ -61,9 +132,11 @@ def deal_bulk_action(user_info_list, fansnum_max):
         user_domain = user_info_list[uid]['domain'].encode('utf-8')
         user_fansnum = user_info_list[uid]['fansnum']
         results['importance'] = get_importance(user_domain, results['topic_string'], user_fansnum, fansnum_max)
+        
         #bulk action
         action = {'update':{'_id': uid}}
         bulk_action.extend([action, {'doc': results}])
+    #print 'bulk_action:', bulk_action
     es_user_portrait.bulk(bulk_action, index=portrait_index_name, doc_type=portrait_index_type)
     end_ts = time.time()
     #log_should_delete
@@ -214,7 +287,10 @@ if __name__=='__main__':
     print 'cron/text_attribute/update_week.py&start&' + log_time_date
 
     update_attribute_week_v2()
-    
+    #uid_list = ['1007298497', '1082896707'] 
+    #result = get_school(uid_list)
+    #print 'result:', result   
+
     log_time_ts = time.time()
     log_time_date = ts2datetime(log_time_ts)
     print 'cron/text_attribute/update_week.py&start&' + log_time_date

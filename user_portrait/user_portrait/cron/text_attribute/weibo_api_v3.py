@@ -71,7 +71,7 @@ def read_flow_text(uid_list):
     weibo_list = []#微博列表
     now_ts = time.time()
     #run_type
-    if RUN_TYPE = 1:
+    if RUN_TYPE == 1:
         now_date_ts = datetime2ts(ts2datetime(now_ts))
     else:
         now_date_ts = datetime2ts(RUN_TEST_TIME)

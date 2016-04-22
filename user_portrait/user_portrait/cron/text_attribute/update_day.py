@@ -10,17 +10,19 @@ import time
 import math
 import numpy as np
 from evaluate_index import get_evaluate_index
-from flow_information import update_flow_information
+from flow_information import update_flow_information, ip2city
 from save_utils import save_user_results
 from evaluate_index import get_activity_time, get_influence
 from config import activeness_weight_dict
 reload(sys)
 sys.path.append('../../')
 from global_utils import R_CLUSTER_FLOW2 as r_cluster
+from global_utils import R_CLUSTER_FLOW3 as r_cluster_3
+from global_utils import R_ADMIN as r_sensitive
 from global_utils import es_user_portrait, portrait_index_name, portrait_index_type
 from global_utils import update_day_redis, UPDATE_DAY_REDIS_KEY
 from time_utils import ts2datetime, datetime2ts
-from parameter import DAY, WEEK, RUN_TYPE
+from parameter import DAY, WEEK, RUN_TYPE, sensitive_score_dict
 from parameter import RUN_TEST_TIME
 
 WEEK = 7
@@ -43,7 +45,7 @@ def update_day_hashtag(uid_list):
     for i in range(WEEK,0,-1):
         ts = now_date_ts - DAY*i
         count = 0
-        hashtag_results = r_cluster.hmget('hashtag_'+str(ts), uid_list)
+        hashtag_results = r_cluster_3.hmget('hashtag_'+str(ts), uid_list)
         for uid in uid_list:
             if uid not in results:
                 results[uid] = {}
@@ -57,10 +59,11 @@ def update_day_hashtag(uid_list):
                     results[uid][hashtag] += 1
                 except:
                     results[uid][hashtag] = 1
+            count += 1
     for uid in uid_list:
         user_hashtag_dict = results[uid]
         hashtag_string = '&'.join(user_hashtag_dict.keys())
-        all_results[uid] = {'hashtag': hashtag_string, 'hashtag_dict':user_hashtag_dict}
+        all_results[uid] = {'hashtag': hashtag_string, 'hashtag_dict':json.dumps(user_hashtag_dict)}
     return all_results
 
 #get user activity geo and geo_action
@@ -75,7 +78,7 @@ def update_day_geo(uid_list, user_info_list):
         now_date_ts = datetime2ts(ts2datetime(now_ts))
     else:
         now_date_ts = test_ts
-    ip_results = r_cluster.hmget('new_ip__'+str(now_date_ts - DAY), uid_list)
+    ip_results = r_cluster.hmget('new_ip_'+str(now_date_ts - DAY), uid_list)
     count = 0
     for uid in uid_list:
         if uid not in results:
@@ -89,7 +92,7 @@ def update_day_geo(uid_list, user_info_list):
         day_results = {}
         for ip in uid_ip_dict:
             ip_count = len(uid_ip_dict[ip].split('&'))
-            geo = ip2city(ip)
+            geo, school = ip2city(ip)
             geo = geo.decode('utf-8')
             try:
                 day_results[geo] += ip_count
@@ -114,7 +117,7 @@ def update_day_geo(uid_list, user_info_list):
 
         results[uid]['activity_geo'] = week_geo_string
         results[uid]['activity_geo_aggs'] = week_geo_aggs_string
-
+    #print 'update geo results:', results
     return results
 
 #use to get user activeness
@@ -166,7 +169,7 @@ def update_day_sensitive(uid_list):
     for i in range(WEEK,0,-1):
         ts = now_date_ts - DAY*i
         count = 0
-        sensitive_results = r_cluster.hmget('sensitive_'+str(ts), uid_list)
+        sensitive_results = r_cluster_3.hmget('sensitive_'+str(ts), uid_list)
         for uid in uid_list:
             if uid not in results:
                 results[uid] = {}
@@ -190,7 +193,7 @@ def update_day_sensitive(uid_list):
             if tmp_stage:
                 sensitive_score += v * sensitive_score_dict[str(tmp_stage)]
         sensitive_string = '&'.join(user_sensitive_dict.keys())
-        all_results[uid] = {'sensitive_string': sensitive_string, 'sensitive_dict':user_sensitive_dict,\
+        all_results[uid] = {'sensitive_string': sensitive_string, 'sensitive_dict':json.dumps(user_sensitive_dict),\
                 'sensitive': sensitive_score}
     return all_results
 
@@ -253,7 +256,7 @@ def update_attribute_day():
     
     if user_info_list != {}:
         uid_list = user_info_list.keys()
-        print 'uid_list:', uid_list
+        print 'uid_list:', len(uid_list)
         #get user_list hashtag_results
         print 'get hashtag result'
         hashtag_results = update_day_hashtag(uid_list)
@@ -324,6 +327,9 @@ if __name__=='__main__':
     print 'cron/text_attribute/update_day.py&start&'+ log_time_date
 
     update_attribute_day()
+    #uid_list = ['1002169831', '1005413812']
+    #results = update_day_sensitive(uid_list)
+    #print 'results:', results
     
     log_time_ts = time.time()
     log_time_date = ts2datetime(log_time_ts)
