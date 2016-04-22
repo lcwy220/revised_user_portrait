@@ -72,7 +72,7 @@ def send_weibo(sender, poller, controller, total_count=0, total_cost=0):
 
     file_list = set(os.listdir(BIN_FILE_PATH))
     print "total file is ", len(file_list)
-    file_list = ordered_file_list(file_list)
+#    ordered_list = ordered_file_list(file_list)
     for each in file_list:
         event = poller.poll(0)
         if event:

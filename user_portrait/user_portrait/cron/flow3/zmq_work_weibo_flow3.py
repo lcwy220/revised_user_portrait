@@ -98,7 +98,7 @@ if __name__ == "__main__":
                 comment_uname2uid(item)
 
         count += 1
-        if count % 10000 == 0 and RUN_TYPE == 0:
+        if count % 10000 == 0:
             te = time.time()
             print '[%s] cal speed: %s sec/per %s' % (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), te - ts, 10000) 
             if count % 100000 == 0:

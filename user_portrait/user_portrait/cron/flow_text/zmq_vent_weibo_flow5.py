@@ -15,16 +15,20 @@ reload(sys)
 sys.path.append('../../')
 from global_config import ZMQ_VENT_PORT_FLOW5, ZMQ_CTRL_VENT_PORT_FLOW5,\
                           ZMQ_VENT_HOST_FLOW1, ZMQ_CTRL_HOST_FLOW1, BIN_FILE_PATH
-
-
+from global_utils import R_CLUSTER_FLOW3 as r
+from time_utils import ts2datetime, datetime2ts
+from parameter import EXPIRE_TIME
 
 if __name__=="__main__":
     """
     push data to every work
 
     """
-    
-
+    """
+    now_ts = datetime2ts(ts2datetime(time.time()-EXPIRE_TIME))
+    del_sensitive_key = "sensitive_" + now_ts
+    r.delete(del_sensitive_key)
+    """
     context = zmq.Context()
 
     # used for send weibo
@@ -41,7 +45,7 @@ if __name__=="__main__":
     
     total_count = 0
     total_cost = 0
-    message = "PAUSE" # default start
+    message = "RESTART" # default start
 
     while 1:
         event = poller.poll(0)

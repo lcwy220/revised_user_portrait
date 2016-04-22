@@ -33,11 +33,10 @@ from global_config import UNAME2UID_HASH as uname2uid_hash
 from parameter import RUN_TYPE, RUN_TEST_TIME, DAY,sensitive_score_dict
 from flow_text_mappings import get_mappings
 from global_config import SENSITIVE_WORDS_PATH
-from global_utils import R_CLUSTER_FLOW2 as r_cluster
+from global_utils import R_CLUSTER_FLOW3 as r_cluster
 from global_utils import R_ADMIN as r_sensitive
 
 start_date = '2016-03-03'
-DFA = createWordTree()
 
 #ip to city 
 #input: ip
@@ -148,6 +147,7 @@ def get_weibo_keywords(keywords_list):
 def expand_index_action(item):
     index_body = {}
     index_body['uid'] = str(item['uid'])
+    index_body['user_fansnum'] = int(item.get('user_fansnum', 0))
     index_body['text'] = item['text']
     index_body['mid'] = str(item['mid'])
     index_body['sentiment'] = str(item['sentiment'])
@@ -157,6 +157,9 @@ def expand_index_action(item):
     index_body['keywords_string'] = item['keywords_string']
     index_body['sensitive_words_string'] = item['sensitive_words_string']
     index_body['sensitive_words_dict'] = item['sensitive_words_dict']
+    index_body['retweeted'] = 0
+    index_body['comment'] = 0
+    index_body['sensitive'] = 0
     sensitive_words_dict = json.loads(item['sensitive_words_dict'])
     if sensitive_words_dict:
         score = 0
@@ -209,6 +212,7 @@ if __name__ == "__main__":
     controller = context.socket(zmq.SUB)
     controller.connect("tcp://%s:%s" %(ZMQ_VENT_HOST_FLOW1, ZMQ_CTRL_VENT_PORT_FLOW5))
 
+    DFA = createWordTree()
     count = 0
     read_count = 0
     tb = time.time()
@@ -230,6 +234,7 @@ if __name__ == "__main__":
         if int(item['sp_type']) == 1:
             read_count += 1
             text = item['text']
+            uid = item['uid']
 
             #add sentiment field to weibo
             sentiment, keywords_list  = triple_classifier(item)
@@ -293,9 +298,11 @@ if __name__ == "__main__":
             class_ts = class_te
 
         #run_type
-        if read_count % 10000 == 0 and RUN_TYPE == 0:
+        if read_count % 10000 == 0:
             te = time.time()
             print '[%s] cal speed: %s sec/per %s' % (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), te - ts, 10000) 
             if read_count % 100000 == 0:
                 print '[%s] total cal %s, cost %s sec [avg %s per/sec]' % (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), read_count, te - tb, read_count / (te - tb)) 
+                if read_count % 10000000 == 0:
+                    DFA = createWordTree()
             ts = te

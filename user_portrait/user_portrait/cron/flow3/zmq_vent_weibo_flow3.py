@@ -41,7 +41,7 @@ if __name__=="__main__":
     
     total_count = 0
     total_cost = 0
-    message = "PAUSE" # default start
+    message = "RESTART" # default start
 
     while 1:
         event = poller.poll(1)

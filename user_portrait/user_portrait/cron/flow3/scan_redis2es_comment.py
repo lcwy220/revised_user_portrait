@@ -22,11 +22,12 @@ begin_ts = datetime2ts(R_BEGIN_TIME)
 def get_db_num(timestamp):
     date = ts2datetime(timestamp)
     date_ts = datetime2ts(date)
-    db_number = 2 - (((date_ts - begin_ts) / (DAY * 7))) % 2
+    db_number = (((date_ts - begin_ts) / (DAY * 7))) % 2 + 1
     #run_type
     if RUN_TYPE == 0:
         db_number = 1
-    return db_number
+    #db_number = 1
+    return str(db_number)
 
 
 def scan_comment():
@@ -40,17 +41,16 @@ def scan_comment():
     
     #get redis db
     comment_redis = comment_redis_dict[str(db_number)]
-    """
+   
     # 1. 判断即将切换的db中是否有数据
+    redis_host_list.remove(str(db_number))
     while 1:
-        redis_host_list.pop(str(db_number))
         other_db_number = comment_redis_dict[redis_host_list[0]]
         current_dbsize = other_db_number.dbsize()
         if current_dbsize:
             break # 已经开始写入新的db，说明前一天的数据已经写完
         else:
             time.sleep(60)
-    """
 
     # 2. 删除之前的es
     comment_es_mappings(str(db_number))
@@ -103,8 +103,8 @@ def scan_comment():
         be_comment_bulk_action = []
         end_ts = time.time()
         #run_type
-        if RUN_TYPE == 0:
-            print '%s sec scan %s count user' % (end_ts - start_ts, count)
+        #if RUN_TYPE == 1:
+        #    print '%s sec scan %s count user' % (end_ts - start_ts, count)
 
         start_ts = end_ts
         scan_cursor = re_scan[0]
@@ -112,7 +112,7 @@ def scan_comment():
             break
 
     # 4. flush redis
-    #comment_redis.flushdb()
+    comment_redis.flushdb()
 
 
 def split_bulk_action(bulk_action, index_name):

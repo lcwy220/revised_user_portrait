@@ -18,6 +18,7 @@ from global_config import ZMQ_VENT_PORT_FLOW2, ZMQ_CTRL_VENT_PORT_FLOW2,\
                           ZMQ_VENT_HOST_FLOW1, ZMQ_CTRL_HOST_FLOW1
 from parameter import RUN_TYPE, RUN_TEST_TIME
 Fifteenminutes = 15*60
+
 def extract_uname(text):
     at_uname_list = []
     if isinstance(text, str):

@@ -11,7 +11,7 @@ import copy
 reload(sys)
 sys.path.append('./../../')
 from global_utils import es_user_profile as es
-from global_utils import R_CLUSTER_FLOW2 as r
+from global_utils import R_CLUSTER_FLOW3 as r
 from global_utils import R_ADMIN as r_sensitive
 from parameter import sensitive_score_dict, DAY
 from global_utils import ES_SENSITIVE_INDEX, DOCTYPE_SENSITIVE_INDEX
@@ -63,6 +63,7 @@ def compute_month(item, now_ts):
 def main():
     if RUN_TYPE:
         now_ts = time.time()-DAY # 前一天
+        now_ts = datetime2ts('2016-03-24')
         ts = str(datetime2ts(ts2datetime(now_ts)))
     else:
         ts = str(datetime2ts('2016-03-16'))

@@ -15,7 +15,9 @@ reload(sys)
 sys.path.append('../../')
 from global_config import ZMQ_VENT_PORT_FLOW2, ZMQ_CTRL_VENT_PORT_FLOW2,\
                           ZMQ_VENT_HOST_FLOW1, ZMQ_CTRL_HOST_FLOW1, BIN_FILE_PATH
-
+from global_utils import R_CLUSTER_FLOW2 as r
+from time_utils import ts2datetime, datetime2ts 
+from parameter import EXPIRE_TIME
 
 
 if __name__=="__main__":
@@ -23,8 +25,16 @@ if __name__=="__main__":
     push data to every work
 
     """
-    
-
+    """
+    # delete former redis data
+    now_ts = datetime2ts(ts2datetime(time.time()-EXPIRE_TIME))
+    del_at_key = "at_" + str(now_ts)
+    del_ip_key = "new_ip_" + str(now_ts)
+    del_activity_key = 'activity_' + str(now_ts)
+    r.delete(del_activity_key)
+    r.delete(del_at_key)
+    r.delete(del_ip_key)
+    """
     context = zmq.Context()
 
     # used for send weibo
@@ -41,12 +51,12 @@ if __name__=="__main__":
     
     total_count = 0
     total_cost = 0
-    message = "PAUSE" # default start
+    message = "RESTART" # default start
 
     while 1:
-        event = poller.poll(1)
+        event = poller.poll(0)
         if event:
-            socks = dict(poller.poll(1))
+            socks = dict(poller.poll(0))
         else:
             socks = None
         
@@ -54,17 +64,20 @@ if __name__=="__main__":
             item = controller.recv()
             if item == "PAUSE": # pause the vent work
                 message = "PAUSE"
-                time.sleep(10)
+                time.sleep(1)
                 continue
             elif item == "RESTART": # restart the vent work
                 message = "RESTART"
+                total_count = 0
+                total_cost = 0
                 total_count, total_cost = send_weibo(sender, poller, controller, total_count, total_cost)
         else:
             if message == "PAUSE":
-                time.sleep(10)
+                time.sleep(1)
                 print message
                 continue
             else:
+                time.sleep(1)
                 total_count, total_cost = send_weibo(sender, poller, controller,  total_count, total_cost)
 
            

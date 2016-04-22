@@ -22,6 +22,18 @@ def get_queue_index(timestamp):
     index = hour*4+math.ceil(minute/15.0) #every 15 minutes
     return int(index)
 
+def mapping_index(index):
+    index = int(index)
+    if index in set(range(24)):
+        return 1
+    elif index in set(range(24, 48)):
+        return 2
+    elif index in set(range(48, 72)):
+        return 3
+    else:
+        return 4
+
+
 def cal_propage_work(item):
     cluster_redis = R_CLUSTER_FLOW1
     user = str(item['uid'])
@@ -40,6 +52,7 @@ def cal_propage_work(item):
 
     if message_type == 1:
         cluster_redis.sadd('user_set', user)
+        cluster_redis.hset(user, mid, mid) # 
         cluster_redis.sadd(user + '_origin_weibo', mid)
         #cluster_redis.hset(user, mid + '_origin_weibo_retweeted', 0)
         #cluster_redis.hset(user, mid + '_origin_weibo_comment', 0)
@@ -47,38 +60,45 @@ def cal_propage_work(item):
 
     elif message_type == 2: # comment weibo
         cluster_redis.sadd('user_set', user)
-        if cluster_redis.sismember(user + '_comment_weibo', retweeted_mid):
-            return 
-        cluster_redis.sadd(user + '_comment_weibo', retweeted_mid)
+        #if cluster_redis.sismember(user + '_comment_weibo', retweeted_mid):
+        #    return 
+        cluster_redis.sadd(user + '_comment_weibo', mid)
         RE = re.compile(u'//@([a-zA-Z-_⺀-⺙⺛-⻳⼀-⿕々〇〡-〩〸-〺〻㐀-䶵一-鿃豈-鶴侮-頻並-龎]+):', re.UNICODE)
         nicknames = RE.findall(text)
         queue_index = get_queue_index(timestamp)
         #cluster_redis.hincrby(user, 'comment_weibo', 1)
 
-        #if 1:
-        if len(nicknames) == 0:
-            cluster_redis.hincrby(retweeted_uid, retweeted_mid + '_origin_weibo_comment', 1) 
-            cluster_redis.hincrby(retweeted_uid, 'origin_weibo_comment_timestamp_%s' % queue_index, 1)
-            #cluster_redis.hset(retweeted_uid, retweeted_mid + '_origin_weibo_comment_timestamp', timestamp)
+        cluster_redis.hincrby(retweeted_uid, retweeted_mid + '_origin_weibo_comment', 1) 
+        cluster_redis.hincrby(retweeted_uid, 'origin_weibo_comment_timestamp_%s' % queue_index, 1)
+        cluster_redis.zincrby('influence_comment', retweeted_uid, 1) # 用户在15分钟内的转发
+        index_id = mapping_index(queue_index)
+        cluster_redis.zincrby('influence_comment_%s' %index_id, retweeted_uid, 1)
 
-        else:
-            nick_id = nicknames[0]
-            _id = r_name.hget("weibo_user", nick_id)
-            if _id:
-                cluster_redis.hincrby(str(_id), retweeted_mid + '_retweeted_weibo_comment', 1) 
-                cluster_redis.hincrby(str(_id), 'retweeted_weibo_comment_timestamp_%s' % queue_index, 1)
+        if nicknames:
+            for nick_id in nicknames:
+                _id = r_name.hget("weibo_user", nick_id)
+                if _id:
+                    cluster_redis.zincrby("influence_comment_%s" %index_id, _id, 1) # 用户在15分钟内的转发
+                    tmp_mid = cluster_redis.hget(_id, retweeted_mid)
+                    if tmp_mid:
+                        cluster_redis.hincrby(str(_id), tmp_mid + '_retweeted_weibo_comment', 1) 
+                        cluster_redis.hincrby(str(_id), 'retweeted_weibo_comment_timestamp_%s' % queue_index, 1)
                 #cluster_redis.hset(str(_id), retweeted_mid + '_retweeted_weibo_comment_timestamp', timestamp)
 
     elif message_type == 3:
         cluster_redis.sadd('user_set', user)
-        if cluster_redis.sismember(user + '_retweeted_weibo', retweeted_mid):
-            return
+        #if cluster_redis.sismember(user + '_retweeted_weibo', retweeted_mid):
+        #    return
 
-        cluster_redis.sadd(user + '_retweeted_weibo', retweeted_mid)
+        cluster_redis.hset(user, retweeted_mid, mid) # uid, root_mid, mid
+        cluster_redis.sadd(user + '_retweeted_weibo', mid)
         #cluster_redis.hset(user, retweeted_mid + '_retweeted_weibo_timestamp', timestamp) 
         queue_index = get_queue_index(timestamp)
+        index_id = mapping_index(queue_index)
         cluster_redis.hincrby(retweeted_uid, 'origin_weibo_retweeted_timestamp_%s' % queue_index, 1)
         cluster_redis.hincrby(retweeted_uid, retweeted_mid + '_origin_weibo_retweeted', 1) 
+        cluster_redis.zincrby('influence_retweeted', retweeted_uid, 1) # 用户在15分钟内的转发
+        cluster_redis.zincrby('influence_retweeted_%s' % index_id, retweeted_uid, 1) # 用户在15分钟内的转发
         #cluster_redis.hset(user, retweeted_mid + '_retweeted_weibo_retweeted', 0)
         #cluster_redis.hset(user, retweeted_mid + '_retweeted_weibo_comment', 0)
         RE = re.compile(u'//@([a-zA-Z-_⺀-⺙⺛-⻳⼀-⿕々〇〡-〩〸-〺〻㐀-䶵一-鿃豈-鶴侮-頻並-龎]+):', re.UNICODE)
@@ -87,9 +107,12 @@ def cal_propage_work(item):
             for nick_id in nicknames:
                 _id = r_name.hget("weibo_user", nick_id)
                 if _id:
-                    cluster_redis.hincrby(str(_id), retweeted_mid+'_retweeted_weibo_retweeted', 1) 
+                    cluster_redis.zincrby('influence_retweeted_%s' %index_id, _id, 1) # 用户在15分钟内的转发
+                    tmp_mid = cluster_redis.hget(_id, retweeted_mid)
+                    if tmp_mid:
+                        cluster_redis.hincrby(str(_id), tmp_mid +'_retweeted_weibo_retweeted', 1) 
                     #cluster_redis.hset(str(_id), retweeted_mid+'_retweeted_weibo_retweeted_timestamp', timestamp)
-                    cluster_redis.hincrby(str(_id), 'retweeted_weibo_retweeted_timestamp_%s' % queue_index, 1)
+                        cluster_redis.hincrby(str(_id), 'retweeted_weibo_retweeted_timestamp_%s' % queue_index, 1)
 
 
 if __name__ == "__main__":

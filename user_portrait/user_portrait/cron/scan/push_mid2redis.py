@@ -2,6 +2,7 @@
 #将mid和更新的值push到redis里
 
 import time
+import json
 import sys
 import redis
 from elasticsearch import Elasticsearch
@@ -12,6 +13,7 @@ from global_utils import es_flow_text as es_text
 from global_utils import redis_flow_text_mid as r_flow
 from global_utils import flow_text_index_name_pre, flow_text_index_type
 from parameter import DAY, RUN_TYPE
+from time_utils import ts2datetime, datetime2ts, ts2date
 
 def main():
     scan_cursor = 0
@@ -23,9 +25,12 @@ def main():
     if RUN_TYPE:
         ts = time.time() - DAY
         date = ts2datetime(ts)
+        start_time = str(ts2datetime(time.time()))
+        print "/cron/push_mid2redis.py&start&%s" %start_time
     else:
         date = '2013-09-05'
     index_name = flow_text_index_name_pre+date
+    print index_name
 
     ts = time.time()
     while 1:
@@ -37,12 +42,18 @@ def main():
                 detail_dict = r.hgetall(uid)
                 for k,v in detail_dict.iteritems():
                     update_dict = dict()
-                    if "_origin_weibo_retweeted" in k and int(v):
+                    if "_origin_weibo_retweeted" in k and v:
                         mid = k.split('_')[0]
                         update_dict["retweeted"] = int(v)
-                    elif "_origin_weibo_comment" in k and int(v):
+                    elif "_origin_weibo_comment" in k and v:
                         mid = k.split('_')[0]
                         update_dict["comment"] = int(v)
+                    elif '_retweeted_weibo_comment' in k and v:
+                        mid = k.split('_')[0]
+                        update_dict["comment"] = int(v)
+                    elif '_retweeted_weibo_retweeted' in k and v:
+                        mid = k.split('_')[0]
+                        update_dict["retweeted"] = int(v)
                     else:
                         pass
                     if update_dict:
@@ -50,12 +61,11 @@ def main():
                         xdata = {"doc": update_dict}
                         bulk_action.extend([action, xdata])
                         count += 1
-                        if count % 1000 == 0:
-                            #print bulk_action
+                        if count % 400 == 0:
                             r_flow.lpush('update_mid_list', json.dumps(bulk_action))
                             bulk_action = []
                             tp = time.time()
-                            print "%s cost %s" %(count, tp-ts)
+                            #print "%s cost %s" %(count, tp-ts)
                             ts = tp
         if int(scan_cursor) == 0:
             break
@@ -67,3 +77,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    start_time = str(ts2datetime(time.time()))
+    print "/cron/push_mid2redis.py&end&%s" %start_time

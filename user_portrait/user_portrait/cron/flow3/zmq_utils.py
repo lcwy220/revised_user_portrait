@@ -13,13 +13,34 @@ reload(sys)
 sys.path.append('../../')
 from global_config import ZMQ_VENT_PORT_FLOW3, ZMQ_CTRL_VENT_PORT_FLOW3, ZMQ_VENT_HOST_FLOW1, ZMQ_CTRL_HOST_FLOW1, BIN_FILE_PATH, WRITTEN_TXT_PATH
 from global_config import REPLICA_BIN_FILE_PATH
+from time_utils import ts2datetime, datetime2ts
 
-BIN_FILE_PATH = REPLICA_BIN_FILE_PATH
+#BIN_FILE_PATH = REPLICA_BIN_FILE_PATH
+
+current_date = ts2datetime(time.time()).replace('-', '')
+#current_date = "20160328"
 
 def load_items_from_bin(bin_path):
     return open(bin_path, 'rb')
 
-#def ordered_file_list(file_list):
+def ordered_file_list():
+    file_list = set(os.listdir(BIN_FILE_PATH))
+    tmp_list = []
+    for each in file_list:
+        try:
+            tmp = each[:16]
+            new_time = time.mktime(time.strptime(tmp,"%Y%m%d%H:%M:%S"))
+            tmp_list.append(new_time)
+        except:
+            time.sleep(1)
+    sorted_list = sorted(tmp_list)
+    order_list = []
+    for each in sorted_list:
+        tmp = time.strftime("%Y%m%d%H:%M:%S", time.localtime(each))
+        order_list.append(tmp+'.data')
+
+    return order_list
+
     
 
 def send_all(f, sender):
@@ -49,13 +70,13 @@ def send_all(f, sender):
             sender.send_json(weibo_item)
             count += 1
 
-        if count % 10000 == 0:
-            te = time.time()
-            print '[%s] deliver speed: %s sec/per %s' % (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), te - ts, 10000)
-            time.sleep(1)
-        if count % 100000 == 0:
-            print '[%s] total deliver %s, cost %s sec [avg %s per/sec]' % (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), count, te - tb, count / (te - tb))
-            ts = te
+            if count % 10000 == 0:
+                te = time.time()
+                print '[%s] deliver speed: %s sec/per %s' % (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), te - ts, 10000)
+                time.sleep(1)
+            if count % 100000 == 0:
+                print '[%s] total deliver %s, cost %s sec [avg %s per/sec]' % (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), count, te - tb, count / (te - tb))
+                ts = te
 
     total_cost = time.time() - tb
     return count, total_cost
@@ -66,8 +87,8 @@ def send_weibo(sender, poller, controller, total_count=0, total_cost=0):
     send weibo data to zmq_work
     """
 
-    file_list = set(os.listdir(BIN_FILE_PATH))
-    #file_list = set(os.listdir(REPLICA_BIN_FILE_PATH))
+    #file_list = set(os.listdir(BIN_FILE_PATH))
+    file_list = ordered_file_list()
     txt_list = set(os.listdir(WRITTEN_TXT_PATH))
     print "total file is ", len(file_list)
     for each in file_list:
@@ -86,7 +107,8 @@ def send_weibo(sender, poller, controller, total_count=0, total_cost=0):
         if 'data' in each:
             filename = each.split('.')[0]
             print filename
-            if '%s_yes3.txt' % filename not in txt_list and "20160308" in filename:
+            if '%s_yes3.txt' % filename not in txt_list and current_date in filename:
+                print "current date", current_date
                 bin_input = load_items_from_bin(os.path.join(BIN_FILE_PATH, each))
                 load_origin_data_func = bin_input
                 tmp_count, tmp_cost = send_all(load_origin_data_func, sender)

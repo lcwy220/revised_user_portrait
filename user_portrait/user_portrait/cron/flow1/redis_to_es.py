@@ -67,9 +67,10 @@ def compute(user_set, bulk_action):
             elif "comment_weibo" == key:
                 pass
             else:
-                print user_info
-                print key
-                print user
+                #print user_info
+                #print key
+                #print user
+                pass
 
         user_id = str(user)
         origin_weibo_retweeted_detail, origin_weibo_retweeted_total_number, origin_weibo_retweeted_top, origin_weibo_retweeted_average_number \
@@ -110,6 +111,7 @@ def compute(user_set, bulk_action):
         user_item['origin_weibo_number'] = len(origin_weibo_set)
         user_item['comment_weibo_number'] = len(comment_weibo_set)
         user_item['retweeted_weibo_number'] = len(retweeted_weibo_set)
+        user_item['total_number'] = len(origin_weibo_set) + len(comment_weibo_set) + len(retweeted_weibo_set)
 
         user_item['origin_weibo_retweeted_total_number'] = origin_weibo_retweeted_total_number
         user_item['origin_weibo_retweeted_average_number'] = origin_weibo_retweeted_average_number
@@ -153,7 +155,7 @@ def compute(user_set, bulk_action):
         if count_c % 1000 == 0:
             es.bulk(bulk_action, index=es_index, doc_type='bci', timeout=30)
             bulk_action = []
-            print count_c
+            ##print count_c
     return bulk_action
 
 if __name__ == "__main__":
@@ -164,12 +166,14 @@ if __name__ == "__main__":
     now_ts = str(int(time.time()))
     print_log = "&".join([file_path, "start", now_ts])
     print print_log
+    
+    time.sleep(60)
 
     es_index = time.strftime("%Y%m%d", time.localtime(time.time()-86400))
-    es_index = "20160306"
+    #es_index = "20160321"
     es_index = pre_influence_index + es_index
     bool = es.indices.exists(index=es_index)
-    print bool
+    #print bool
     if not bool:
         mappings(es, es_index)
 
@@ -188,7 +192,7 @@ if __name__ == "__main__":
             count += 10000
 
             ts = time.time()
-            print "%s : %s" %(count, ts - tb)
+            #print "%s : %s" %(count, ts - tb)
             tb = ts
         elif bulk_action:
             count += len(temp)
