@@ -80,7 +80,7 @@ def get_max_index(term):
 
 # normalize
 def normal_index(index, max_index):
-    normal_value = math.log((index / max_index) * 9 + 1, 10) * 100
+    normal_value = math.log((index / float(max_index)) * 9 + 1, 10) * 100
     return normal_value
 
 
@@ -152,13 +152,15 @@ def main():
             count += 1
             uid = scan_re['uid']
             influence_value = scan_re['sensitive']
+            if uid == "1461686400":
+                print influence_value
             normal_influence = normal_index(influence_value, max_influence)
             add_info[uid] = {update_bci_key: normal_influence, "domain": scan_re['domain'], "activity_geo": scan_re["activity_geo"], "hashtag": scan_re['hashtag'], "topic_string": scan_re["topic_string"]}
 
-            if count % 1000 == 0:
-                co_search(add_info, update_bci_key, former_bci_key, now_ts)
+            #if count % 1000 == 0:
+            #    co_search(add_info, update_bci_key, former_bci_key, now_ts)
         except StopIteration:
-            co_search(add_info, update_bci_key, former_bci_key, now_ts)
+            #co_search(add_info, update_bci_key, former_bci_key, now_ts)
             break
         #except Exception, r:
         #    print Exception, r

@@ -80,7 +80,7 @@ def get_max_index(term):
 
 # normalize
 def normal_index(index, max_index):
-    normal_value = math.log((index / max_index) * 9 + 1, 10) * 100
+    normal_value = math.log((index / float(max_index)) * 9 + 1, 10) * 100
     return normal_value
 
 
